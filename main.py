@@ -355,7 +355,7 @@ if not st.session_state.questions:
                     q_list = get_tecmo_questions(experience_level, num_questions, is_ar)
                     st.session_state.questions = q_list
                     if q_list:
-                        st.session_state.audio_files = {0: asyncio.run(generate_voice(q_list, is_ar))}
+                        st.session_state.audio_files = {0: asyncio.run(generate_voice(q_list[0][0], is_ar))}
                     st.rerun()
 if st.session_state.questions and st.session_state.current_q < len(st.session_state.questions):
     idx = st.session_state.current_q
