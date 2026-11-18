@@ -1,7 +1,7 @@
 # ==============================================================================
-# Project: Ticmo Digital Assessment Hub & HR Analytics
-# Developed & Designed by: Ticmo & Aseel Al-Asmari (شركة تكمو وأسيل الأسمري)
-# Copyright (c) 2026 Ticmo & Aseel Al-Asmari. All Rights Reserved.
+# Project: Tecmo Digital Assessment Hub & HR Analytics
+# Developed & Designed by: Tecmo & Aseel Al-Asmari (شركة تكمو وأسيل الأسمري)
+# Copyright (c) 2026 Tecmo & Aseel Al-Asmari. All Rights Reserved.
 # ==============================================================================
 
 import streamlit as st
@@ -16,14 +16,14 @@ from datetime import datetime
 from pypdf import PdfReader
 
 st.set_page_config(
-    page_title="Ticmo | Digital Assessment Hub",
+    page_title="Tecmo | Digital Assessment Hub",
     page_icon="💠",
     layout="centered"
 )
 
 # --- إعدادات قاعدة البيانات المحلية ولوحة الإدارة ---
-RECORDS_FILE = "ticmo_candidates_records.csv"
-HR_ADMIN_CODE = "TICMO2026"
+RECORDS_FILE = "Tecmo_candidates_records.csv"
+HR_ADMIN_CODE = "Tecmo2026"
 
 def save_candidate_record(record_dict):
     df_new = pd.DataFrame([record_dict])
@@ -108,7 +108,7 @@ def get_embedded_logo_html():
             return f'<img src="data:image/{ext};base64,{b64}" style="max-height:75px; margin-bottom:10px; border-radius:8px;">'
     return """
     <div style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #003366, #0066cc); color:white; padding:8px 24px; border-radius:12px; margin-bottom:10px;">
-        <span style="font-size:24px; font-weight:800; letter-spacing:1.5px;">Ticmo</span>
+        <span style="font-size:24px; font-weight:800; letter-spacing:1.5px;">Tecmo</span>
         <span style="background:#ffffff; color:#0052cc; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; margin-left:8px;">تكمو</span>
     </div>
     """
@@ -123,7 +123,7 @@ if is_ar:
     st.markdown(f'<div class="modern-top-card">{logo_html}<h1>بوابة تكمو للتقييم الرقمي</h1><p>تجربة تقييم تفاعلية ذكية لاستقطاب الكفاءات (صوت وكتابة)</p></div>', unsafe_allow_html=True)
 else:
     st.markdown("<style>.main { direction: ltr; text-align: left; }</style>", unsafe_allow_html=True)
-    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>Ticmo Digital Assessment Hub</h1><p>Interactive AI-Powered Talent Screening Experience (Voice & Text)</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>Tecmo Digital Assessment Hub</h1><p>Interactive AI-Powered Talent Screening Experience (Voice & Text)</p></div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown(f"<div style='text-align:center;'>{logo_html}</div>", unsafe_allow_html=True)
@@ -164,7 +164,7 @@ if st.session_state.get("hr_mode", False):
         st.download_button(
             label="📥 تحميل ملف الإكسل المرتب (Excel CSV)" if is_ar else "📥 Download Organized Excel File",
             data=csv_data,
-            file_name=f"Ticmo_Candidates_{datetime.now().strftime('%Y%m%d')}.csv",
+            file_name=f"Tecmo_Candidates_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
     if st.button("إغلاق لوحة الإدارة والعودة للبوابة" if is_ar else "Close Admin Dashboard"):
@@ -176,7 +176,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.info("مرحباً بك في بوابة التقييم الرقمي لشركة تكمو. أدخل بريدك الإلكتروني للمتابعة (يُسمح بالتقديم مرة واحدة فقط)." if is_ar else "Welcome to Ticmo Digital Assessment Hub. Enter your email to proceed (One submission per candidate).")
+    st.info("مرحباً بك في بوابة التقييم الرقمي لشركة تكمو. أدخل بريدك الإلكتروني للمتابعة (يُسمح بالتقديم مرة واحدة فقط)." if is_ar else "Welcome to Tecmo Digital Assessment Hub. Enter your email to proceed (One submission per candidate).")
     user_email = st.text_input("البريد الإلكتروني:" if is_ar else "Email Address:", placeholder="name@example.com")
     if st.button("المتابعة إلى التقييم ➔" if is_ar else "Proceed to Assessment ➔"):
         clean_email = user_email.strip()
@@ -190,11 +190,11 @@ if not st.session_state.authenticated:
         else:
             st.error("يرجى إدخال بريد إلكتروني صحيح." if is_ar else "Please enter a valid email address.")
     st.divider()
-    st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Ticmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Tecmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
     st.stop()
 
 # --- بنك 12 سؤالاً مع اختيار عشوائي متجدد (من 1 إلى 5 أسئلة) ---
-def get_ticmo_questions(level, count, arabic_mode):
+def get_Tecmo_questions(level, count, arabic_mode):
     if arabic_mode:
         bank = [
             "من واقع سيرتك الذاتية، ما هو أبرز مشروع أو إنجاز تعتز به ويعكس إمكاناتك المهنية؟",
@@ -213,7 +213,7 @@ def get_ticmo_questions(level, count, arabic_mode):
     else:
         bank = [
             "Based on your resume, what is the key project or achievement that best demonstrates your capabilities?",
-            "Briefly highlight your core professional strengths and how you can contribute to team success at Ticmo.",
+            "Briefly highlight your core professional strengths and how you can contribute to team success at Tecmo.",
             "Share a real-world situation where you faced an unexpected challenge and how you resolved it effectively.",
             "How do you prioritize tasks and maintain high accuracy in a fast-paced, dynamic environment?",
             "In the rapidly evolving FinTech sector, how do you continuously upgrade your skills and stay current?",
@@ -223,7 +223,7 @@ def get_ticmo_questions(level, count, arabic_mode):
             "How do you balance innovative thinking with strict adherence to operational standards and quality?",
             "What type of work environment enables you to perform at your highest potential?",
             "When you disagree with a teammate on an approach, how do you navigate the discussion toward the best solution?",
-            "What drives your professional ambition and excites you about joining an innovative FinTech company like Ticmo?"
+            "What drives your professional ambition and excites you about joining an innovative FinTech company like Tecmo?"
         ]
     return random.sample(bank, min(count, len(bank)))
 
@@ -246,7 +246,7 @@ if not st.session_state.questions:
         st.success(f"✅ {'تم إرفاق السيرة الذاتية:' if is_ar else 'Resume attached:'} {uploaded_cv.name}")
         if st.button("ابدأ التقييم الآن ➔" if is_ar else "Begin Assessment Now ➔"):
             with st.spinner("جاري تجهيز محاور التقييم العشوائية..." if is_ar else "Preparing randomized assessment topics..."):
-                q_list = get_ticmo_questions(experience_level, num_questions, is_ar)
+                q_list = get_Tecmo_questions(experience_level, num_questions, is_ar)
                 st.session_state.questions = q_list
                 if q_list:
                     st.session_state.audio_files = {0: asyncio.run(generate_voice(q_list[0], is_ar))}
@@ -291,7 +291,7 @@ if st.session_state.questions and st.session_state.current_q < len(st.session_st
 
 if st.session_state.questions and st.session_state.current_q == len(st.session_state.questions) and not st.session_state.note_submitted:
     st.progress(0.95, text="الخطوة الختامية: مساحة التواصل" if is_ar else "Final Step: Open Communication")
-    st.subheader("💬 مساحة مفتوحة للتواصل مع فريق تكمو" if is_ar else "💬 Open Space to Connect with Ticmo Team")
+    st.subheader("💬 مساحة مفتوحة للتواصل مع فريق تكمو" if is_ar else "💬 Open Space to Connect with Tecmo Team")
     note_input = st.text_area("هل لديك أي استفسار أو رسالة تود مشاركتها معنا؟ (اختياري):" if is_ar else "Do you have any questions or notes you would like to share with us? (Optional):", placeholder="اكتب رسالتك أو استفسارك هنا..." if is_ar else "Write your message or inquiry here...", height=110)
     col1, col2 = st.columns(2)
     with col1:
@@ -330,9 +330,9 @@ if st.session_state.questions and st.session_state.current_q == len(st.session_s
         st.session_state.record_saved = True
 
     if is_ar:
-        st.success("🌟 **شكراً لمشاركتك ووقتك الثمين!** تم حفظ استجاباتك في نظام التوظيف بنجاح (جلسة واحدة معتمدة). نتمنى لك كل التوفيق والنجاح، وسيتواصل معك فريق استقطاب المواهب في **شركة تكمو (Ticmo)** قريباً.")
+        st.success("🌟 **شكراً لمشاركتك ووقتك الثمين!** تم حفظ استجاباتك في نظام التوظيف بنجاح (جلسة واحدة معتمدة). نتمنى لك كل التوفيق والنجاح، وسيتواصل معك فريق استقطاب المواهب في **شركة تكمو (Tecmo)** قريباً.")
     else:
-        st.success("🌟 **Thank You for Your Time & Participation!** Your responses have been saved (Single verified session). We wish you every success, and the Talent Acquisition team at **Ticmo** will be in touch soon.")
+        st.success("🌟 **Thank You for Your Time & Participation!** Your responses have been saved (Single verified session). We wish you every success, and the Talent Acquisition team at **Tecmo** will be in touch soon.")
     
     st.subheader("📊 مؤشرات التقييم التنفيذي" if is_ar else "📊 Executive Evaluation Metrics")
     m1, m2, m3 = st.columns(3)
@@ -342,13 +342,13 @@ if st.session_state.questions and st.session_state.current_q == len(st.session_s
     st.divider()
     if is_ar:
         details_md = "\n\n".join([f"**المحور {i+1}:** {e['question']}\n- نوع الرد: `{e['type']}` | التفاصيل: `{e['detail']}` | التقييم: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Ticmo)\n- **المستوى المهني:** {experience_level}\n- **البريد الإلكتروني:** {st.session_state.get('user_email', '')}\n- **مؤشر الجاهزية:** **{percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### 💬 رسالة المرشح لفريق تكمو:\n> {st.session_state.candidate_note}\n\n#### تفاصيل المحاور:\n{details_md}"
+        report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Tecmo)\n- **المستوى المهني:** {experience_level}\n- **البريد الإلكتروني:** {st.session_state.get('user_email', '')}\n- **مؤشر الجاهزية:** **{percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### 💬 رسالة المرشح لفريق تكمو:\n> {st.session_state.candidate_note}\n\n#### تفاصيل المحاور:\n{details_md}"
     else:
         details_md = "\n\n".join([f"**Topic {i+1}:** {e['question']}\n- Mode: `{e['type']}` | Details: `{e['detail']}` | Score: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 Digital Candidate Assessment Summary - Ticmo\n- **Career Level:** {experience_level}\n- **Email:** {st.session_state.get('user_email', '')}\n- **Readiness Index:** **{percentage}%**\n- **Recommendation:** **{decision_en}**\n\n#### 💬 Candidate Note to Ticmo:\n> {st.session_state.candidate_note}\n\n#### Topic Breakdown:\n{details_md}"
+        report_text = f"### 📋 Digital Candidate Assessment Summary - Tecmo\n- **Career Level:** {experience_level}\n- **Email:** {st.session_state.get('user_email', '')}\n- **Readiness Index:** **{percentage}%**\n- **Recommendation:** **{decision_en}**\n\n#### 💬 Candidate Note to Tecmo:\n> {st.session_state.candidate_note}\n\n#### Topic Breakdown:\n{details_md}"
 
     st.markdown(report_text)
-    st.download_button(label="📥 تحميل ملف التقييم (Assessment Summary)" if is_ar else "📥 Download Assessment Summary", data=report_text, file_name=f"Ticmo_Assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
+    st.download_button(label="📥 تحميل ملف التقييم (Assessment Summary)" if is_ar else "📥 Download Assessment Summary", data=report_text, file_name=f"Tecmo_Assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
 
 st.divider()
-st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Ticmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Tecmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
