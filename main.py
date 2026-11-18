@@ -38,6 +38,13 @@ def load_all_records():
         return pd.read_csv(RECORDS_FILE, sep=";")
     return pd.DataFrame()
 
+def check_email_already_submitted(email_to_check):
+    df = load_all_records()
+    if not df.empty and "البريد الإلكتروني / Email" in df.columns:
+        submitted_emails = df["البريد الإلكتروني / Email"].astype(str).str.lower().str.strip().tolist()
+        return email_to_check.lower().strip() in submitted_emails
+    return False
+
 def analyze_cv_content(uploaded_file, job_role, arabic_mode):
     try:
         reader = PdfReader(uploaded_file)
@@ -276,7 +283,6 @@ if st.session_state.get("hr_mode", False):
         st.rerun()
     st.stop()
 
-# --- بنك 12 سؤالاً مع اختيار عشوائي متجدد ---
 def get_tecmo_questions(level, count, arabic_mode):
     if arabic_mode:
         bank = [
@@ -317,12 +323,16 @@ async def generate_voice(text, arabic_mode):
     await communicate.save(temp_file.name)
     return temp_file.name
 
-for key, default in [("questions", []), ("current_q", 0), ("audio_files", {}), ("evaluations", []), ("candidate_note", ""), ("note_submitted", False), ("record_saved", False), ("cv_analysis", None)]:
+for key, default in [("questions", []), ("current_q", 0), ("audio_files", {}), ("evaluations", []), ("candidate_note", ""), ("note_submitted", False), ("record_saved", False), ("cv_analysis", None), ("user_email", "")]:
     if key not in st.session_state:
         st.session_state[key] = default
 
+# --- بطاقة البداية في منتصف الصفحة (تشمل البريد الإلكتروني + تحليل السيرة + زر البدء) ---
 if not st.session_state.questions:
-    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'حدد المسمى الوظيفي والمنطقة، وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية ليقوم النظام بتحليل مهاراتك وبدء التقييم.' if is_ar else 'Select your target job title and region, and upload your Resume (PDF) in the sidebar for automated skill analysis.'}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'حدد المسمى الوظيفي والمنطقة وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية، ثم أدخل بريدك الإلكتروني أدناه للبدء فوراً.' if is_ar else 'Select your job title, region, and upload your Resume (PDF) in the sidebar, then enter your email below to start.'}</p></div>", unsafe_allow_html=True)
+    
+    email_input = st.text_input("البريد الإلكتروني للمرشح (إجباري - يُسمح بالتقديم مرة واحدة) *:" if is_ar else "Candidate Email Address (Mandatory - One attempt only) *:", placeholder="name@example.com")
+    
     if uploaded_cv is None:
         st.warning("⚠️ حقل السيرة الذاتية (PDF) إجباري في القائمة الجانبية لتفعيل زر بدء التقييم." if is_ar else "⚠️ Uploading your Resume / CV (PDF) in the sidebar is mandatory to start the assessment.")
     else:
@@ -334,12 +344,19 @@ if not st.session_state.questions:
         st.info(f"🔍 **{cv_info['summary']}**\n\n📌 **{'المسمى الوظيفي:' if is_ar else 'Target Role:'}** {final_job_role} | 📍 **{'المنطقة:' if is_ar else 'Region:'}** {selected_region}")
         
         if st.button("ابدأ التقييم الآن ➔" if is_ar else "Begin Assessment Now ➔"):
-            with st.spinner("جاري تجهيز محاور التقييم العشوائية..." if is_ar else "Preparing randomized assessment topics..."):
-                q_list = get_tecmo_questions(experience_level, num_questions, is_ar)
-                st.session_state.questions = q_list
-                if q_list:
-                    st.session_state.audio_files = {0: asyncio.run(generate_voice(q_list, is_ar))}
-                st.rerun()
+            clean_email = email_input.strip()
+            if "@" not in clean_email or "." not in clean_email.split("@")[-1] or len(clean_email) < 5:
+                st.error("⚠️ يرجى إدخال بريد إلكتروني صحيح في الحقل أعلاه قبل البدء." if is_ar else "⚠️ Please enter a valid email address above before starting.")
+            elif check_email_already_submitted(clean_email):
+                st.error("⚠️ عذراً، لقد قمت بإجراء هذا التقييم مسبقاً بهذا البريد الإلكتروني. لا يُسمح بإعادة الجلسة أكثر من مرة." if is_ar else "⚠️ You have already completed this assessment with this email. Multiple attempts are not permitted.")
+            else:
+                st.session_state.user_email = clean_email
+                with st.spinner("جاري تجهيز محاور التقييم العشوائية..." if is_ar else "Preparing randomized assessment topics..."):
+                    q_list = get_tecmo_questions(experience_level, num_questions, is_ar)
+                    st.session_state.questions = q_list
+                    if q_list:
+                        st.session_state.audio_files = {0: asyncio.run(generate_voice(q_list, is_ar))}
+                    st.rerun()
 if st.session_state.questions and st.session_state.current_q < len(st.session_state.questions):
     idx = st.session_state.current_q
     total = len(st.session_state.questions)
@@ -411,6 +428,7 @@ if st.session_state.questions and st.session_state.current_q == len(st.session_s
         answers_summary = " | ".join([f"Q{i+1} ({e['type']}): {e['detail']}" for i, e in enumerate(st.session_state.evaluations)])
         save_candidate_record({
             "التاريخ والوقت / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "البريد الإلكتروني / Email": st.session_state.user_email,
             "المسمى الوظيفي / Job Role": final_job_role,
             "المنطقة / Region": selected_region,
             "المستوى / Level": experience_level,
@@ -436,10 +454,10 @@ if st.session_state.questions and st.session_state.current_q == len(st.session_s
     st.divider()
     if is_ar:
         details_md = "\n\n".join([f"**المحور {i+1}:** {e['question']}\n- نوع الرد: `{e['type']}` | التفاصيل: `{e['detail']}` | التقييم: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Tecmo)\n- **المسمى الوظيفي:** {final_job_role}\n- **المنطقة:** {selected_region}\n- **المستوى المهني:** {experience_level}\n- **المهارات المستخرجة من السيرة الذاتية:** {cv_info['skills']}\n- **مؤشر الجاهزية العام:** **{final_percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### 💬 رسالة المرشح لفريق تكمو:\n> {st.session_state.candidate_note}\n\n#### تفاصيل المحاور:\n{details_md}"
+        report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Tecmo)\n- **البريد الإلكتروني:** {st.session_state.user_email}\n- **المسمى الوظيفي:** {final_job_role}\n- **المنطقة:** {selected_region}\n- **المستوى المهني:** {experience_level}\n- **المهارات المستخرجة من السيرة الذاتية:** {cv_info['skills']}\n- **مؤشر الجاهزية العام:** **{final_percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### 💬 رسالة المرشح لفريق تكمو:\n> {st.session_state.candidate_note}\n\n#### تفاصيل المحاور:\n{details_md}"
     else:
         details_md = "\n\n".join([f"**Topic {i+1}:** {e['question']}\n- Mode: `{e['type']}` | Details: `{e['detail']}` | Score: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 Digital Candidate Assessment Summary - Tecmo\n- **Target Role:** {final_job_role}\n- **Region:** {selected_region}\n- **Career Level:** {experience_level}\n- **Extracted Resume Skills:** {cv_info['skills']}\n- **Overall Readiness Index:** **{final_percentage}%**\n- **Recommendation:** **{decision_en}**\n\n#### 💬 Candidate Note to Tecmo:\n> {st.session_state.candidate_note}\n\n#### Topic Breakdown:\n{details_md}"
+        report_text = f"### 📋 Digital Candidate Assessment Summary - Tecmo\n- **Email:** {st.session_state.user_email}\n- **Target Role:** {final_job_role}\n- **Region:** {selected_region}\n- **Career Level:** {experience_level}\n- **Extracted Resume Skills:** {cv_info['skills']}\n- **Overall Readiness Index:** **{final_percentage}%**\n- **Recommendation:** **{decision_en}**\n\n#### 💬 Candidate Note to Tecmo:\n> {st.session_state.candidate_note}\n\n#### Topic Breakdown:\n{details_md}"
 
     st.markdown(report_text)
     st.download_button(label="📥 تحميل ملف التقييم (Assessment Summary)" if is_ar else "📥 Download Assessment Summary", data=report_text, file_name=f"Tecmo_Assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
