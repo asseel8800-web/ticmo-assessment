@@ -2,3 +2,4 @@ streamlit
 edge-tts
 pypdf
 pandas
+requests
