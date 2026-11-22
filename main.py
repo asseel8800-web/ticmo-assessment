@@ -236,72 +236,75 @@ with st.sidebar:
     st.divider()
     st.header("📋 بيانات التقديم" if is_ar else "📋 Application Details")
     
-    roles_ar = [
-        "أخصائي / موظف موارد بشرية وشؤون موظفين (HR)",
-        "مسؤول استقطاب وتوظيف وعلاقات حكومية (قوى / مدد)",
-        "مهندس مدني / معماري / موقع (مقاولات)",
-        "مهندس ميكانيكي / كهربائي / صيانة",
-        "مشرف إنتاج وتشغيل",
-        "مشرف أمن وسلامة مهنية (HSE / Safety)",
-        "مهندس ضبط جودة (QA/QC)",
-        "أمين مستودع / مشتريات وسلاسل إمداد",
-        "محاسب / مالية وتكاليف",
-        "تطوير أعمال وعقود ومبيعات",
-        "تدريب تعاوني (Co-op Training)",
-        "أخرى (مسمى مخصص)"
-    ]
-    roles_en = [
-        "HR & Personnel Specialist",
-        "Talent Acquisition & Gov Relations (Qiwa / Mudad)",
-        "Civil / Architectural / Site Engineer",
-        "Mechanical / Electrical / Maintenance Engineer",
-        "Production & Operations Supervisor",
-        "Health & Safety Officer (HSE / Safety)",
-        "Quality Assurance / Control Engineer (QA/QC)",
-        "Warehouse / Procurement & Supply Chain",
-        "Accountant / Finance & Costing",
-        "Business Development & Contracts",
-        "Cooperative Training (Co-op)",
-        "Other (Custom Role)"
-    ]
-    selected_role = st.selectbox("المسمى الوظيفي المتقدم له:" if is_ar else "Target Job Title:", roles_ar if is_ar else roles_en)
-    if selected_role in ["أخرى (مسمى مخصص)", "Other (Custom Role)"]:
-        custom_role = st.text_input("اكتب المسمى الوظيفي:" if is_ar else "Enter Job Title:")
-        final_job_role = custom_role.strip() if custom_role.strip() else selected_role
-    else:
-        final_job_role = selected_role
+    # حقل كتابة حرة للمسمى الوظيفي من قبل المتقدم
+    job_role_input = st.text_input(
+        "المسمى الوظيفي المتقدم له *:" if is_ar else "Target Job Title *:",
+        placeholder="مثال: أخصائي موارد بشرية، مهندس مدني، محاسب..." if is_ar else "e.g., HR Specialist, Civil Engineer, Accountant..."
+    )
+    final_job_role = job_role_input.strip()
 
-    regions_ar = [
-        "منطقة الرياض",
-        "المنطقة الشرقية (الدمام، الخبر، الظهران، الجبيل، الأحساء)",
-        "منطقة مكة المكرمة (جدة، مكة، الطائف)",
-        "منطقة المدينة المنورة",
-        "منطقة عسير (أبها، خميس مشيط)",
-        "منطقة القصيم",
-        "منطقة تبوك (نيوم)",
-        "منطقة حائل",
-        "منطقة جازان",
-        "منطقة نجران",
-        "منطقة الباحة",
-        "منطقة الجوف",
-        "منطقة الحدود الشمالية"
+    # قائمة المدن المفصلة في المملكة العربية السعودية
+    cities_ar = [
+        "الدمام (المنطقة الشرقية)",
+        "الخبر (المنطقة الشرقية)",
+        "الظهران (المنطقة الشرقية)",
+        "الجبيل (المنطقة الشرقية)",
+        "الأحساء (المنطقة الشرقية)",
+        "القطيف (المنطقة الشرقية)",
+        "حفر الباطن (المنطقة الشرقية)",
+        "الخفجي (المنطقة الشرقية)",
+        "رأس تنورة (المنطقة الشرقية)",
+        "الرياض",
+        "الخرج (منطقة الرياض)",
+        "جدة (منطقة مكة المكرمة)",
+        "مكة المكرمة",
+        "الطائف (منطقة مكة المكرمة)",
+        "المدينة المنورة",
+        "ينبع (منطقة المدينة المنورة)",
+        "بريدة (القصيم)",
+        "عنيزة (القصيم)",
+        "أبها (عسير)",
+        "خميس مشيط (عسير)",
+        "تبوك",
+        "نيوم (تبوك)",
+        "حائل",
+        "جازان",
+        "نجران",
+        "الباحة",
+        "سكاكا (الجوف)",
+        "عرعر (الحدود الشمالية)"
     ]
-    regions_en = [
-        "Riyadh Region",
-        "Eastern Province (Dammam, Khobar, Dhahran, Jubail, Al-Ahsa)",
-        "Makkah Region (Jeddah, Makkah, Taif)",
-        "Madinah Region",
-        "Aseer Region (Abha, Khamis Mushait)",
-        "Qassim Region",
-        "Tabuk Region (NEOM)",
-        "Hail Region",
-        "Jazan Region",
-        "Najran Region",
-        "Al-Bahah Region",
-        "Al-Jouf Region",
-        "Northern Borders Region"
+    cities_en = [
+        "Dammam (Eastern Province)",
+        "Khobar (Eastern Province)",
+        "Dhahran (Eastern Province)",
+        "Jubail (Eastern Province)",
+        "Al-Ahsa (Eastern Province)",
+        "Qatif (Eastern Province)",
+        "Hafar Al-Batin (Eastern Province)",
+        "Khafji (Eastern Province)",
+        "Ras Tanura (Eastern Province)",
+        "Riyadh",
+        "Al-Kharj (Riyadh Region)",
+        "Jeddah (Makkah Region)",
+        "Makkah",
+        "Taif (Makkah Region)",
+        "Madinah",
+        "Yanbu (Madinah Region)",
+        "Buraidah (Qassim)",
+        "Unaizah (Qassim)",
+        "Abha (Aseer)",
+        "Khamis Mushait (Aseer)",
+        "Tabuk",
+        "NEOM (Tabuk)",
+        "Hail",
+        "Jazan",
+        "Najran",
+        "Al-Bahah",
+        "Sakaka (Al-Jouf)",
+        "Arar (Northern Borders)"
     ]
-    selected_region = st.selectbox("المنطقة في السعودية:" if is_ar else "Region in Saudi Arabia:", regions_ar if is_ar else regions_en)
+    selected_region = st.selectbox("المدينة / مقر التقديم:" if is_ar else "City / Location:", cities_ar if is_ar else cities_en)
 
     exp_options = ["حديث تخرج / مبتدئ", "متوسط الخبرة", "خبير / قيادي"] if is_ar else ["Fresh Graduate / Junior", "Mid-Level", "Senior / Lead"]
     experience_level = st.selectbox("المستوى المهني:" if is_ar else "Career Level:", exp_options)
@@ -408,23 +411,25 @@ for key, default in [("questions", []), ("current_q", 0), ("audio_files", {}), (
         st.session_state[key] = default
 
 if not st.session_state.questions:
-    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'حدد المسمى الوظيفي والمنطقة وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية ليقوم النظام بتحليلها وتصنيف تخصصك تلقائياً، ثم أدخل بريدك الإلكتروني أدناه للبدء.' if is_ar else 'Select your job title, region, and upload your Resume (PDF) in the sidebar for automated specialty classification, then enter your email below.'}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'اكتب المسمى الوظيفي وحدد المدينة وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية ليقوم النظام بتحليلها وتصنيف تخصصك تلقائياً، ثم أدخل بريدك الإلكتروني أدناه للبدء.' if is_ar else 'Enter your target job title, select your city, and upload your Resume (PDF) in the sidebar for automated specialty classification, then enter your email below.'}</p></div>", unsafe_allow_html=True)
     
     email_input = st.text_input("البريد الإلكتروني للمرشح (إجباري - يُسمح بالتقديم مرة واحدة) *:" if is_ar else "Candidate Email Address (Mandatory - One attempt only) *:", placeholder="name@example.com")
     
     if uploaded_cv is None:
-        st.warning("⚠️ حقل السيرة الذاتية (PDF) إجباري في القائمة الجانبية لتفعيل زر بدء التقييم." if is_ar else "⚠️ Uploading your Resume / CV (PDF) in the sidebar is mandatory to start the assessment.")
+        st.warning("⚠️ يرجى كتابة المسمى الوظيفي وإرفاق السيرة الذاتية (PDF) في القائمة الجانبية لتفعيل زر بدء التقييم." if is_ar else "⚠️ Please enter your Target Job Title and upload your Resume / CV (PDF) in the sidebar to start.")
     else:
         if st.session_state.cv_analysis is None:
             st.session_state.cv_analysis = analyze_cv_by_specialty(uploaded_cv, final_job_role, is_ar)
         
         cv_info = st.session_state.cv_analysis
         st.success(f"✅ {'تم تحليل وتصنيف السيرة الذاتية:' if is_ar else 'Resume Analyzed & Classified:'} **{uploaded_cv.name}**")
-        st.info(f"{cv_info['summary']}\n\n📌 **{'المسمى المستهدف:' if is_ar else 'Target Role:'}** {final_job_role} | 📍 **{'المنطقة:' if is_ar else 'Region:'}** {selected_region}")
+        st.info(f"{cv_info['summary']}\n\n📌 **{'المسمى المستهدف:' if is_ar else 'Target Role:'}** {final_job_role or ('غير محدد' if is_ar else 'Not Specified')} | 📍 **{'المدينة:' if is_ar else 'City:'}** {selected_region}")
         
         if st.button("ابدأ التقييم الآن ➔" if is_ar else "Begin Assessment Now ➔"):
             clean_email = email_input.strip()
-            if "@" not in clean_email or "." not in clean_email.split("@")[-1] or len(clean_email) < 5:
+            if not final_job_role:
+                st.error("⚠️ يرجى كتابة المسمى الوظيفي المتقدم له في القائمة الجانبية أولاً." if is_ar else "⚠️ Please enter your Target Job Title in the sidebar first.")
+            elif "@" not in clean_email or "." not in clean_email.split("@")[-1] or len(clean_email) < 5:
                 st.error("⚠️ يرجى إدخال بريد إلكتروني صحيح في الحقل أعلاه قبل البدء." if is_ar else "⚠️ Please enter a valid email address above before starting.")
             elif check_email_already_submitted(clean_email):
                 st.error("⚠️ عذراً، لقد قمت بإجراء هذا التقييم مسبقاً بهذا البريد الإلكتروني." if is_ar else "⚠️ You have already completed this assessment with this email.")
@@ -445,5 +450,3 @@ if st.session_state.questions and st.session_state.current_q < len(st.session_st
         st.session_state.audio_files[idx] = asyncio.run(generate_voice(current_question_text, is_ar))
     st.audio(st.session_state.audio_files[idx], format="audio/mp3", autoplay=True)
     
-    method_voice = "🎙️ الرد الصوتي (مدة مفتوحة)" if is_ar else "🎙️ Voice Reply (Open Duration)"
-    method_text = "✍️ الرد الكتابي" if is_ar else "✍️ Written Reply"
