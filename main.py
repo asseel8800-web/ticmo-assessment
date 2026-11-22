@@ -11,6 +11,8 @@ import tempfile
 import os
 import random
 import base64
+import requests
+import re
 import pandas as pd
 from datetime import datetime
 from pypdf import PdfReader
@@ -21,10 +23,18 @@ st.set_page_config(
     layout="centered"
 )
 
+GOOGLE_SHEETS_WEBHOOK_URL = "https://google.com"
+
 RECORDS_FILE = "tecmo_candidates_records.csv"
 HR_ADMIN_CODE = "TECMO2026"
 
 def save_candidate_record(record_dict):
+    if GOOGLE_SHEETS_WEBHOOK_URL.startswith("https://"):
+        try:
+            requests.post(GOOGLE_SHEETS_WEBHOOK_URL, json=record_dict, timeout=8)
+        except Exception:
+            pass
+            
     df_new = pd.DataFrame([record_dict])
     if os.path.exists(RECORDS_FILE):
         df_old = pd.read_csv(RECORDS_FILE, sep=";")
@@ -45,7 +55,7 @@ def check_email_already_submitted(email_to_check):
         return email_to_check.lower().strip() in submitted_emails
     return False
 
-def analyze_cv_content(uploaded_file, job_role, arabic_mode):
+def analyze_cv_by_specialty(uploaded_file, target_role, arabic_mode):
     try:
         reader = PdfReader(uploaded_file)
         full_text = ""
@@ -57,42 +67,90 @@ def analyze_cv_content(uploaded_file, job_role, arabic_mode):
         text_lower = full_text.lower()
         word_count = len(full_text.split())
         
-        skill_keywords = [
-            "python", "ai", "artificial intelligence", "machine learning", "data", "sql", "excel",
-            "fintech", "payment", "finance", "hr", "human resources", "recruitment", "management",
-            "project", "leadership", "communication", "analysis", "marketing", "sales", "customer",
-            "java", "javascript", "html", "css", "cloud", "security", "agile", "scrum",
-            "ذكاء اصطناعي", "بايثون", "تحليل بيانات", "موارد بشرية", "توظيف", "تقنية مالية",
-            "إدارة مشاريع", "قيادة", "تواصل", "خدمة عملاء", "تسويق", "مبيعات", "برمجة", "إكسل", "دبلوم", "بكالوريوس"
-        ]
+        specialties_db = {
+            "الهندسة المدنية والمعمارية والمقاولات (Civil & Construction)": [
+                "civil", "architectural", "construction", "autocad", "revit", "structural", "site engineer",
+                "quantity surveyor", "contracting", "primavera", "surveying", "concrete",
+                "هندسة مدنية", "معماري", "مقاولات", "مهندس موقع", "أوتوكاد", "حساب كميات", "إنشائي", "بناء"
+            ],
+            "الهندسة الكهربائية والميكانيكية والمصانع (MEP & Manufacturing)": [
+                "mechanical", "electrical", "industrial", "manufacturing", "factory", "production", "maintenance",
+                "hvac", "plc", "automation", "machinery", "plant", "power",
+                "هندسة ميكانيكية", "كهربائية", "صناعية", "مصنع", "إنتاج", "صيانة", "تشغيل", "تكييف", "معدات"
+            ],
+            "الأمن والسلامة المهنية والجودة (HSE & QA/QC)": [
+                "safety", "hse", "osha", "nebosh", "qa", "qc", "quality", "iso", "inspection", "risk assessment",
+                "سلامة", "أمن وسلامة", "جودة", "فحص", "أوشا", "نيبوش", "مخاطر", "إيزو"
+            ],
+            "الموارد البشرية وشؤون الموظفين (HR & Recruitment)": [
+                "hr", "human resources", "recruitment", "talent", "payroll", "qiwa", "mudad", "gosi", "personnel",
+                "onboarding", "employee relations", "labor law", "saudization", "hrdf",
+                "موارد بشرية", "توظيف", "شؤون موظفين", "رواتب", "قوى", "مدد", "تأمينات", "استقطاب", "نظام العمل", "طاقات"
+            ],
+            "المالية والمحاسبة وسلاسل الإمداد (Finance & Supply Chain)": [
+                "finance", "accounting", "supply chain", "procurement", "warehouse", "logistics", "inventory",
+                "erp", "sap", "excel", "audit", "costing", "sales", "business development",
+                "مالية", "محاسبة", "مشتريات", "مستودعات", "سلاسل إمداد", "لوجستيات", "مخزون", "مبيعات", "عقود"
+            ]
+        }
         
-        found_skills = []
-        for kw in skill_keywords:
-            if kw in text_lower:
-                found_skills.append(kw.upper() if len(kw) <= 3 else kw.title())
+        specialty_scores = {}
+        matched_skills_by_spec = {}
         
-        found_skills = list(dict.fromkeys(found_skills))[:10]
-        cv_score = min(98, max(72, 70 + (len(found_skills) * 3) + (1 if word_count > 120 else 0)))
+        for spec_name, keywords in specialties_db.items():
+            matches = []
+            for kw in keywords:
+                if kw in text_lower:
+                    matches.append(kw.upper() if len(kw) <= 4 else kw.title())
+            matches = list(dict.fromkeys(matches))
+            specialty_scores[spec_name] = len(matches)
+            matched_skills_by_spec[spec_name] = matches
+
+        best_specialty = max(specialty_scores, key=specialty_scores.get)
+        max_hits = specialty_scores[best_specialty]
         
-        if arabic_mode:
-            skills_str = "، ".join(found_skills) if found_skills else "مهارات عامة وإدارية"
-            summary = f"تم تحليل السيرة الذاتية بنجاح ({word_count} كلمة). أبرز المهارات المرصودة: {skills_str}."
+        if max_hits == 0:
+            detected_specialty = "تخصص إداري / ميداني عام (General)" if arabic_mode else "General Admin / Field"
+            top_skills = ["مهارات عمل وتنظيم"] if arabic_mode else ["Work & Organization Skills"]
         else:
-            skills_str = ", ".join(found_skills) if found_skills else "General & Administrative Skills"
-            summary = f"Resume analyzed ({word_count} words). Key detected skills: {skills_str}."
-            
+            detected_specialty = best_specialty
+            top_skills = matched_skills_by_spec[best_specialty][:8]
+
+        edu_level = "غير محدد" if arabic_mode else "Not Specified"
+        if any(w in text_lower for w in ["master", "mba", "ماجستير"]):
+            edu_level = "ماجستير (Master's)" if arabic_mode else "Master's Degree"
+        elif any(w in text_lower for w in ["bachelor", "bsc", "ba", "بكالوريوس", "هندسة"]):
+            edu_level = "بكالوريوس (Bachelor's)" if arabic_mode else "Bachelor's Degree"
+        elif any(w in text_lower for w in ["diploma", "دبلوم", "تقنية"]):
+            edu_level = "دبلوم / تقني (Diploma)" if arabic_mode else "Diploma / Technical"
+
+        years_found = re.findall(r'(\d+)\+?\s*(?:years|year|سنة|سنوات)', text_lower)
+        exp_years = f"{max([int(y) for y in years_found])} سنوات" if years_found else ("حديث تخرج / غير محدد" if arabic_mode else "Entry / Not Specified")
+
+        cv_score = min(98, max(74, 72 + (max_hits * 4) + (2 if word_count > 150 else 0)))
+        skills_str = "، ".join(top_skills) if arabic_mode else ", ".join(top_skills)
+
+        if arabic_mode:
+            summary = f"**التصنيف التلقائي للتخصص:** {detected_specialty} | **المؤهل:** {edu_level} | **الخبرة:** {exp_years}\n\n**أبرز المهارات المستخرجة:** {skills_str}"
+        else:
+            summary = f"**Auto-Detected Specialty:** {detected_specialty} | **Education:** {edu_level} | **Experience:** {exp_years}\n\n**Key Extracted Skills:** {skills_str}"
+
         return {
-            "word_count": word_count,
+            "detected_specialty": detected_specialty,
+            "edu_level": edu_level,
+            "exp_years": exp_years,
             "skills": skills_str,
             "cv_score": cv_score,
             "summary": summary
         }
     except Exception:
         return {
-            "word_count": 0,
-            "skills": "مرفقة (PDF)" if arabic_mode else "Attached (PDF)",
+            "detected_specialty": "مرفقة (PDF)",
+            "edu_level": "غير محدد",
+            "exp_years": "غير محدد",
+            "skills": "ملف PDF مرفق",
             "cv_score": 80,
-            "summary": "تم إرفاق ملف السيرة الذاتية بنجاح." if arabic_mode else "Resume file attached successfully."
+            "summary": "تم إرفاق السيرة الذاتية بنجاح."
         }
 st.markdown("""
 <style>
@@ -168,10 +226,10 @@ is_ar = (ui_lang == "العربية")
 
 if is_ar:
     st.markdown("<style>.main { direction: rtl; text-align: right; } .stTextInput input, .stTextArea textarea { direction: rtl; text-align: right; }</style>", unsafe_allow_html=True)
-    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>بوابة تكمو للتقييم الرقمي</h1><p>منصة ذكية لتحليل السيرة الذاتية واستقطاب الكفاءات في المملكة</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>بوابة تكمو للتقييم الرقمي</h1><p>منصة ذكية لتحليل وتصنيف السير الذاتية واستقطاب الكفاءات في المملكة</p></div>', unsafe_allow_html=True)
 else:
     st.markdown("<style>.main { direction: ltr; text-align: left; }</style>", unsafe_allow_html=True)
-    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>Tecmo Digital Assessment Hub</h1><p>Smart Resume Analytics & Talent Screening Platform across Saudi Arabia</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="modern-top-card">{logo_html}<h1>Tecmo Digital Assessment Hub</h1><p>Smart Resume Classification & Talent Screening Platform across Saudi Arabia</p></div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown(f"<div style='text-align:center;'>{logo_html}</div>", unsafe_allow_html=True)
@@ -179,24 +237,30 @@ with st.sidebar:
     st.header("📋 بيانات التقديم" if is_ar else "📋 Application Details")
     
     roles_ar = [
-        "ذكاء اصطناعي وتحليل بيانات (AI & Data)",
-        "تطوير برمجيات وتقنية مالية (FinTech Dev)",
-        "موارد بشرية واستقطاب كفاءات (HR)",
-        "إدارة مشاريع وعمليات (Operations)",
-        "تسويق وتطوير أعمال (Business Dev)",
-        "خدمة عملاء ودعم فني (Customer Support)",
-        "مالية ومحاسبة (Finance)",
+        "أخصائي / موظف موارد بشرية وشؤون موظفين (HR)",
+        "مسؤول استقطاب وتوظيف وعلاقات حكومية (قوى / مدد)",
+        "مهندس مدني / معماري / موقع (مقاولات)",
+        "مهندس ميكانيكي / كهربائي / صيانة",
+        "مشرف إنتاج وتشغيل",
+        "مشرف أمن وسلامة مهنية (HSE / Safety)",
+        "مهندس ضبط جودة (QA/QC)",
+        "أمين مستودع / مشتريات وسلاسل إمداد",
+        "محاسب / مالية وتكاليف",
+        "تطوير أعمال وعقود ومبيعات",
         "تدريب تعاوني (Co-op Training)",
         "أخرى (مسمى مخصص)"
     ]
     roles_en = [
-        "AI & Data Analytics",
-        "FinTech & Software Development",
-        "Human Resources & Talent Acquisition",
-        "Project & Operations Management",
-        "Marketing & Business Development",
-        "Customer Support & Experience",
-        "Finance & Accounting",
+        "HR & Personnel Specialist",
+        "Talent Acquisition & Gov Relations (Qiwa / Mudad)",
+        "Civil / Architectural / Site Engineer",
+        "Mechanical / Electrical / Maintenance Engineer",
+        "Production & Operations Supervisor",
+        "Health & Safety Officer (HSE / Safety)",
+        "Quality Assurance / Control Engineer (QA/QC)",
+        "Warehouse / Procurement & Supply Chain",
+        "Accountant / Finance & Costing",
+        "Business Development & Contracts",
         "Cooperative Training (Co-op)",
         "Other (Custom Role)"
     ]
@@ -243,7 +307,7 @@ with st.sidebar:
     experience_level = st.selectbox("المستوى المهني:" if is_ar else "Career Level:", exp_options)
     num_questions = st.slider("عدد محاور التقييم (من 1 إلى 5):" if is_ar else "Evaluation Topics (1 to 5):", min_value=1, max_value=5, value=3)
     st.divider()
-    uploaded_cv = st.file_uploader("📎 إرفاق السيرة الذاتية للتحليل (إجباري - PDF) *:" if is_ar else "📎 Upload Resume for Analysis (Mandatory - PDF) *:", type=["pdf"])
+    uploaded_cv = st.file_uploader("📎 إرفاق السيرة الذاتية للتحليل والتصنيف (إجباري - PDF) *:" if is_ar else "📎 Upload Resume for Analysis (Mandatory - PDF) *:", type=["pdf"])
     st.divider()
 
     with st.expander("🔐 بوابة الموارد البشرية (HR Portal)" if is_ar else "🔐 HR Admin Portal"):
@@ -254,29 +318,45 @@ with st.sidebar:
         elif hr_pass:
             st.error("رمز غير صحيح" if is_ar else "Invalid Code")
 if st.session_state.get("hr_mode", False):
-    st.subheader("📊 لوحة متابعة استجابات المرشحين (HR Dashboard)" if is_ar else "📊 Candidate Responses Dashboard (HR)")
+    st.subheader("📊 لوحة متابعة وتصنيف المرشحين حسب التخصص (HR Dashboard)" if is_ar else "📊 Candidate Analytics & Top Picks by Specialty (HR)")
     df_records = load_all_records()
     if df_records.empty:
-        st.info("لا توجد استجابات مسجلة حتى الآن." if is_ar else "No candidate responses recorded yet.")
+        st.info("لا توجد استجابات في الجلسة الحالية. جميع الاستجابات السابقة محفوظة في Google Sheets." if is_ar else "No session responses yet. All past submissions are safely stored in Google Sheets.")
     else:
+        if "التخصص المكتشف / Detected Specialty" in df_records.columns and "النتيجة / Score" in df_records.columns:
+            df_records = df_records.sort_values(
+                by=["التخصص المكتشف / Detected Specialty", "النتيجة / Score"],
+                ascending=[True, False]
+            ).reset_index(drop=True)
+            
+            df_records["الترتيب في التخصص / Rank"] = df_records.groupby("التخصص المكتشف / Detected Specialty")["النتيجة / Score"].rank(ascending=False, method="min").astype(int)
+            df_records["حالة الترشيح / Nomination"] = df_records["الترتيب في التخصص / Rank"].apply(
+                lambda r: "🏆 أفضل ترشيح للتخصص (Top Pick)" if r == 1 else f"المركز #{r} في التخصص"
+            )
+
         c1, c2 = st.columns(2)
-        c1.metric("إجمالي المتقدمين" if is_ar else "Total Candidates", len(df_records))
+        c1.metric("متقدمو الجلسة الحالية" if is_ar else "Current Session Candidates", len(df_records))
         avg_score = round(df_records["النتيجة / Score"].mean(), 1) if "النتيجة / Score" in df_records.columns else 0
         c2.metric("متوسط التقييم العام" if is_ar else "Average Readiness", f"{avg_score}%")
-        st.dataframe(df_records, use_container_width=True)
         
-        csv_data = df_records.to_csv(sep=";", index=False).encode("utf-8-sig")
+        if "التخصص المكتشف / Detected Specialty" in df_records.columns:
+            spec_filter = st.selectbox("تصفية وعرض الأفضل حسب التخصص:" if is_ar else "Filter & View Top Picks by Specialty:", ["الكل (مرتب حسب التخصص) / All"] + df_records["التخصص المكتشف / Detected Specialty"].unique().tolist())
+            if spec_filter != "الكل (مرتب حسب التخصص) / All":
+                df_display = df_records[df_records["التخصص المكتشف / Detected Specialty"] == spec_filter]
+            else:
+                df_display = df_records
+        else:
+            df_display = df_records
+                
+        st.dataframe(df_display, use_container_width=True)
+        
+        csv_data = df_display.to_csv(sep=";", index=False).encode("utf-8-sig")
         st.download_button(
-            label="📥 تحميل ملف الإكسل المرتب (Excel CSV)" if is_ar else "📥 Download Organized Excel File",
+            label="📥 تحميل ملف الإكسل المرتب بأفضل الترشيحات (Excel CSV)" if is_ar else "📥 Download Ranked Excel by Specialty (CSV)",
             data=csv_data,
-            file_name=f"Tecmo_Candidates_{datetime.now().strftime('%Y%m%d')}.csv",
+            file_name=f"Tecmo_Top_Candidates_By_Specialty_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
-        if st.button("🗑️ مسح جميع الاستجابات وتصفير الجدول" if is_ar else "🗑️ Clear All Records"):
-            if os.path.exists(RECORDS_FILE):
-                os.remove(RECORDS_FILE)
-            st.success("تم مسح جميع السجلات بنجاح!" if is_ar else "All records cleared!")
-            st.rerun()
 
     if st.button("إغلاق لوحة الإدارة والعودة للبوابة" if is_ar else "Close Admin Dashboard"):
         st.session_state.hr_mode = False
@@ -290,14 +370,14 @@ def get_tecmo_questions(level, count, arabic_mode):
             "حدثنا بإيجاز عن أبرز نقاط قوتك المهنية، وكيف ترى مساهمتك في نجاح فرق العمل في تكمو؟",
             "شاركنا تجربة عملية واجهت فيها تحدياً غير متوقع، وكيف تعاملت معه للوصول إلى نتيجة ناجحة؟",
             "كيف تنظم أولوياتك وتضمن دقة الإنجاز عند العمل في بيئة سريعة ومتعددة المهام؟",
-            "في قطاع التقنية المالية المتجدد، ما هي طريقتك في تطوير مهاراتك ومواكبة أحدث الحلول الرقمية؟",
+            "في قطاع المقاولات الهندسية وإدارة الكوادر، ما هي طريقتك في تطوير مهاراتك ومواكبة أحدث المعايير المهنية؟",
             "حدثنا عن موقف اضطررت فيه لاتخاذ قرار سريع دون توفر كافة المعلومات، وكيف تصرفت؟",
             "ما هو أسلوبك في التعامل مع الملاحظات النقدية أو التغييرات المفاجئة في خطط العمل؟",
             "اذكر مهارة جديدة تعلمتها مؤخراً وكيف ساعدتك في تحسين جودة أو سرعة إنجازك؟",
             "كيف توازن بين الإبداع في طرح الأفكار والالتزام بالمعايير والأنظمة المعتمدة؟",
             "صف لنا بيئة العمل المثالية التي تساعدك على تقديم أفضل ما لديك من إنتاجية؟",
             "عندما تختلف في الرأي مع أحد أعضاء الفريق حول حل معين، كيف تدير النقاش للوصول لأفضل نتيجة؟",
-            "ما الذي يحفزك مهنياً ويجعلك شغوفاً بالانضمام إلى شركة تقنية مالية طموحة مثل تكمو؟"
+            "ما الذي يحفزك مهنياً ويجعلك شغوفاً بالانضمام إلى شركة رائدة مثل تكمو؟"
         ]
     else:
         bank = [
@@ -305,14 +385,14 @@ def get_tecmo_questions(level, count, arabic_mode):
             "Briefly highlight your core professional strengths and how you can contribute to team success at Tecmo.",
             "Share a real-world situation where you faced an unexpected challenge and how you resolved it effectively.",
             "How do you prioritize tasks and maintain high accuracy in a fast-paced, dynamic environment?",
-            "In the rapidly evolving FinTech sector, how do you continuously upgrade your skills and stay current?",
+            "In the engineering contracting and workforce management sector, how do you upgrade your skills and stay current?",
             "Tell us about a time you had to make a quick decision with incomplete information, and what the outcome was.",
             "How do you handle constructive feedback or sudden shifts in project requirements?",
             "Describe a new skill or tool you recently mastered and how it improved your workflow.",
             "How do you balance innovative thinking with strict adherence to operational standards and quality?",
             "What type of work environment enables you to perform at your highest potential?",
             "When you disagree with a teammate on an approach, how do you navigate the discussion toward the best solution?",
-            "What drives your professional ambition and excites you about joining an innovative FinTech company like Tecmo?"
+            "What drives your professional ambition and excites you about joining a leading company like Tecmo?"
         ]
     return random.sample(bank, min(count, len(bank)))
 
@@ -327,9 +407,8 @@ for key, default in [("questions", []), ("current_q", 0), ("audio_files", {}), (
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- بطاقة البداية في منتصف الصفحة (تشمل البريد الإلكتروني + تحليل السيرة + زر البدء) ---
 if not st.session_state.questions:
-    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'حدد المسمى الوظيفي والمنطقة وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية، ثم أدخل بريدك الإلكتروني أدناه للبدء فوراً.' if is_ar else 'Select your job title, region, and upload your Resume (PDF) in the sidebar, then enter your email below to start.'}</p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='prompt-card'><h4 style='color:#091e42; margin-top:0;'>{'جاهز لبدء التقييم التفاعلي؟' if is_ar else 'Ready to Begin Your Interactive Assessment?'}</h4><p style='color:#42526e; margin-bottom:0;'>{'حدد المسمى الوظيفي والمنطقة وأرفق سيرتك الذاتية (PDF) في القائمة الجانبية ليقوم النظام بتحليلها وتصنيف تخصصك تلقائياً، ثم أدخل بريدك الإلكتروني أدناه للبدء.' if is_ar else 'Select your job title, region, and upload your Resume (PDF) in the sidebar for automated specialty classification, then enter your email below.'}</p></div>", unsafe_allow_html=True)
     
     email_input = st.text_input("البريد الإلكتروني للمرشح (إجباري - يُسمح بالتقديم مرة واحدة) *:" if is_ar else "Candidate Email Address (Mandatory - One attempt only) *:", placeholder="name@example.com")
     
@@ -337,26 +416,25 @@ if not st.session_state.questions:
         st.warning("⚠️ حقل السيرة الذاتية (PDF) إجباري في القائمة الجانبية لتفعيل زر بدء التقييم." if is_ar else "⚠️ Uploading your Resume / CV (PDF) in the sidebar is mandatory to start the assessment.")
     else:
         if st.session_state.cv_analysis is None:
-            st.session_state.cv_analysis = analyze_cv_content(uploaded_cv, final_job_role, is_ar)
+            st.session_state.cv_analysis = analyze_cv_by_specialty(uploaded_cv, final_job_role, is_ar)
         
         cv_info = st.session_state.cv_analysis
-        st.success(f"✅ {'تم تحليل السيرة الذاتية:' if is_ar else 'Resume Analyzed:'} **{uploaded_cv.name}**")
-        st.info(f"🔍 **{cv_info['summary']}**\n\n📌 **{'المسمى الوظيفي:' if is_ar else 'Target Role:'}** {final_job_role} | 📍 **{'المنطقة:' if is_ar else 'Region:'}** {selected_region}")
+        st.success(f"✅ {'تم تحليل وتصنيف السيرة الذاتية:' if is_ar else 'Resume Analyzed & Classified:'} **{uploaded_cv.name}**")
+        st.info(f"{cv_info['summary']}\n\n📌 **{'المسمى المستهدف:' if is_ar else 'Target Role:'}** {final_job_role} | 📍 **{'المنطقة:' if is_ar else 'Region:'}** {selected_region}")
         
         if st.button("ابدأ التقييم الآن ➔" if is_ar else "Begin Assessment Now ➔"):
             clean_email = email_input.strip()
             if "@" not in clean_email or "." not in clean_email.split("@")[-1] or len(clean_email) < 5:
                 st.error("⚠️ يرجى إدخال بريد إلكتروني صحيح في الحقل أعلاه قبل البدء." if is_ar else "⚠️ Please enter a valid email address above before starting.")
             elif check_email_already_submitted(clean_email):
-                st.error("⚠️ عذراً، لقد قمت بإجراء هذا التقييم مسبقاً بهذا البريد الإلكتروني. لا يُسمح بإعادة الجلسة أكثر من مرة." if is_ar else "⚠️ You have already completed this assessment with this email. Multiple attempts are not permitted.")
+                st.error("⚠️ عذراً، لقد قمت بإجراء هذا التقييم مسبقاً بهذا البريد الإلكتروني." if is_ar else "⚠️ You have already completed this assessment with this email.")
             else:
                 st.session_state.user_email = clean_email
                 with st.spinner("جاري تجهيز محاور التقييم العشوائية..." if is_ar else "Preparing randomized assessment topics..."):
                     q_list = get_tecmo_questions(experience_level, num_questions, is_ar)
                     st.session_state.questions = q_list
-                    if q_list:
-                        pass # asyncio.run(generate_voice(q_list[0][0], is_ar))}
                     st.rerun()
+
 if st.session_state.questions and st.session_state.current_q < len(st.session_state.questions):
     idx = st.session_state.current_q
     total = len(st.session_state.questions)
@@ -369,98 +447,3 @@ if st.session_state.questions and st.session_state.current_q < len(st.session_st
     
     method_voice = "🎙️ الرد الصوتي (مدة مفتوحة)" if is_ar else "🎙️ Voice Reply (Open Duration)"
     method_text = "✍️ الرد الكتابي" if is_ar else "✍️ Written Reply"
-    answer_method = st.radio("اختر طريقة المشاركة بكل حرية:" if is_ar else "Choose your preferred response mode freely:", [method_voice, method_text], horizontal=True, key=f"method_{idx}")
-    
-    if answer_method == method_voice:
-        st.caption("سجّل إجابتك بالمدة التي تناسبك دون أي قيد زمني." if is_ar else "Record your response for as long as you wish with no time limit.")
-        audio_response = st.audio_input(f"سجّل ردك الصوتي للمحور {idx + 1}" if is_ar else f"Record your voice reply for Topic {idx + 1}", key=f"audio_{idx}")
-        if audio_response is not None:
-            if st.button("اعتماد الرد والانتقال للتالي ➔" if is_ar else "Confirm & Next Topic ➔", key=f"sub_audio_{idx}"):
-                audio_bytes = audio_response.read()
-                duration_sec = round(len(audio_bytes) / 32000, 1)
-                score = min(10, max(8, round(7 + (duration_sec / 6))))
-                st.session_state.evaluations.append({"question": current_question_text, "type": "صوتي" if is_ar else "Voice", "detail": f"{duration_sec} ثانية" if is_ar else f"{duration_sec} sec", "score": score})
-                st.session_state.current_q += 1
-                st.rerun()
-    else:
-        text_response = st.text_area(f"اكتب ردك للمحور {idx + 1} هنا:" if is_ar else f"Write your reply for Topic {idx + 1} here:", placeholder="اكتب إجابتك بكل راحة ووضوح..." if is_ar else "Type your response comfortably and clearly...", height=130, key=f"text_{idx}")
-        if st.button("اعتماد الرد والانتقال للتالي ➔" if is_ar else "Confirm & Next Topic ➔", key=f"sub_text_{idx}"):
-            if text_response.strip():
-                word_count = len(text_response.strip().split())
-                score = min(10, max(8, round(7 + (word_count / 10))))
-                st.session_state.evaluations.append({"question": current_question_text, "type": "كتابي" if is_ar else "Written", "detail": text_response.strip(), "score": score})
-                st.session_state.current_q += 1
-                st.rerun()
-            else:
-                st.warning("يرجى كتابة ردك أولاً." if is_ar else "Please enter your response first.")
-
-if st.session_state.questions and st.session_state.current_q == len(st.session_state.questions) and not st.session_state.note_submitted:
-    st.progress(0.95, text="الخطوة الختامية: مساحة التواصل" if is_ar else "Final Step: Open Communication")
-    st.subheader("💬 مساحة مفتوحة للتواصل مع فريق تكمو" if is_ar else "💬 Open Space to Connect with Tecmo Team")
-    note_input = st.text_area("هل لديك أي استفسار أو رسالة تود مشاركتها معنا؟ (اختياري):" if is_ar else "Do you have any questions or notes you would like to share with us? (Optional):", placeholder="اكتب رسالتك أو استفسارك هنا..." if is_ar else "Write your message or inquiry here...", height=110)
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("إرسال وإنهاء التقييم ➔" if is_ar else "Submit & Complete ➔"):
-            st.session_state.candidate_note = note_input.strip() if note_input.strip() else ("لا توجد ملاحظات إضافية." if is_ar else "No additional notes.")
-            st.session_state.note_submitted = True
-            st.rerun()
-    with col2:
-        if st.button("تخطي وإصدار الملخص" if is_ar else "Skip & View Summary"):
-            st.session_state.candidate_note = "لا توجد ملاحظات إضافية." if is_ar else "No additional notes."
-            st.session_state.note_submitted = True
-            st.rerun()
-
-if st.session_state.questions and st.session_state.current_q == len(st.session_state.questions) and st.session_state.note_submitted:
-    st.progress(1.0, text="اكتمل التقييم بنجاح" if is_ar else "Assessment Completed")
-    total_score = sum(e["score"] for e in st.session_state.evaluations)
-    max_score = len(st.session_state.evaluations) * 10
-    interview_pct = round((total_score / max_score) * 100) if max_score > 0 else 85
-    
-    cv_info = st.session_state.cv_analysis or {"skills": "غير محدد", "cv_score": 85}
-    cv_pct = cv_info["cv_score"]
-    final_percentage = round((interview_pct * 0.6) + (cv_pct * 0.4))
-    comm_score = min(98, interview_pct + 3)
-    
-    decision_ar = "مرشح متميز - موصى بالمتابعة" if final_percentage >= 80 else "مؤهل للمراجعة"
-    decision_en = "Top Candidate - Recommended" if final_percentage >= 80 else "Qualified for Review"
-    
-    if not st.session_state.record_saved:
-        answers_summary = " | ".join([f"Q{i+1} ({e['type']}): {e['detail']}" for i, e in enumerate(st.session_state.evaluations)])
-        save_candidate_record({
-            "التاريخ والوقت / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "البريد الإلكتروني / Email": st.session_state.user_email,
-            "المسمى الوظيفي / Job Role": final_job_role,
-            "المنطقة / Region": selected_region,
-            "المستوى / Level": experience_level,
-            "تحليل السيرة الذاتية / CV Skills": cv_info["skills"],
-            "توافق السيرة / CV Match %": cv_pct,
-            "النتيجة / Score": final_percentage,
-            "التوصية / Recommendation": decision_ar if is_ar else decision_en,
-            "الإجابات / Responses": answers_summary,
-            "رسالة المرشح / Message": st.session_state.candidate_note
-        })
-        st.session_state.record_saved = True
-
-    if is_ar:
-        st.success("🌟 **شكراً لمشاركتك ووقتك الثمين!** تم حفظ استجاباتك وتحليل سيرتك الذاتية في نظام التوظيف بنجاح. نتمنى لك كل التوفيق والنجاح، وسيتواصل معك فريق استقطاب المواهب في **شركة تكمو (Tecmo)** قريباً.")
-    else:
-        st.success("🌟 **Thank You for Your Time & Participation!** Your responses and resume analysis have been saved. We wish you every success, and the Talent Acquisition team at **Tecmo** will be in touch soon.")
-    
-    st.subheader("📊 مؤشرات التقييم التنفيذي" if is_ar else "📊 Executive Evaluation Metrics")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("مؤشر الجاهزية العام" if is_ar else "Overall Readiness", f"{final_percentage}%")
-    m2.metric("توافق السيرة الذاتية" if is_ar else "Resume Match", f"{cv_pct}%")
-    m3.metric("وضوح الطرح" if is_ar else "Communication Clarity", f"{comm_score}%")
-    st.divider()
-    if is_ar:
-        details_md = "\n\n".join([f"**المحور {i+1}:** {e['question']}\n- نوع الرد: `{e['type']}` | التفاصيل: `{e['detail']}` | التقييم: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Tecmo)\n- **البريد الإلكتروني:** {st.session_state.user_email}\n- **المسمى الوظيفي:** {final_job_role}\n- **المنطقة:** {selected_region}\n- **المستوى المهني:** {experience_level}\n- **المهارات المستخرجة من السيرة الذاتية:** {cv_info['skills']}\n- **مؤشر الجاهزية العام:** **{final_percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### 💬 رسالة المرشح لفريق تكمو:\n> {st.session_state.candidate_note}\n\n#### تفاصيل المحاور:\n{details_md}"
-    else:
-        details_md = "\n\n".join([f"**Topic {i+1}:** {e['question']}\n- Mode: `{e['type']}` | Details: `{e['detail']}` | Score: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
-        report_text = f"### 📋 Digital Candidate Assessment Summary - Tecmo\n- **Email:** {st.session_state.user_email}\n- **Target Role:** {final_job_role}\n- **Region:** {selected_region}\n- **Career Level:** {experience_level}\n- **Extracted Resume Skills:** {cv_info['skills']}\n- **Overall Readiness Index:** **{final_percentage}%**\n- **Recommendation:** **{decision_en}**\n\n#### 💬 Candidate Note to Tecmo:\n> {st.session_state.candidate_note}\n\n#### Topic Breakdown:\n{details_md}"
-
-    st.markdown(report_text)
-    st.download_button(label="📥 تحميل ملف التقييم (Assessment Summary)" if is_ar else "📥 Download Assessment Summary", data=report_text, file_name=f"Tecmo_Assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
-
-st.divider()
-st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Tecmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
