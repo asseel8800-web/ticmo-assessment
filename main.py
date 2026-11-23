@@ -267,4 +267,86 @@ if st.session_state.questions and st.session_state.current_q < len(st.session_st
     
     if answer_method == method_text:
 
+        text_response = st.text_area(f"اكتب إجابتك للمحور {idx + 1} هنا:" if is_ar else f"Write your answer for Topic {idx + 1} here:", placeholder="اكتب إجابتك بكل وضوح..." if is_ar else "Type your answer clearly...", height=130, key=f"text_{idx}")
+        if st.button("اعتماد الإجابة والانتقال للتالي ➔" if is_ar else "Confirm & Next ➔", key=f"sub_text_{idx}"):
+            if text_response.strip():
+                word_count = len(text_response.strip().split())
+                score = min(10, max(8, round(7 + (word_count / 10))))
+                st.session_state.evaluations.append({"question": current_question_text, "type": "كتابي" if is_ar else "Written", "detail": text_response.strip(), "score": score})
+                st.session_state.current_q += 1
+                st.rerun()
+            else:
+                st.warning("يرجى كتابة إجابتك أولاً." if is_ar else "Please enter your answer first.")
+    else:
+        audio_response = st.audio_input(f"سجّل ردك الصوتي للمحور {idx + 1}" if is_ar else f"Record your voice reply for Topic {idx + 1}", key=f"audio_{idx}")
+        if audio_response is not None:
+            if st.button("اعتماد الرد الصوتي والانتقال للتالي ➔" if is_ar else "Confirm Voice & Next ➔", key=f"sub_audio_{idx}"):
+                audio_bytes = audio_response.read()
+                duration_sec = round(len(audio_bytes) / 32000, 1)
+                score = min(10, max(8, round(7 + (duration_sec / 6))))
+                st.session_state.evaluations.append({"question": current_question_text, "type": "صوتي" if is_ar else "Voice", "detail": f"{duration_sec} ثانية" if is_ar else f"{duration_sec} sec", "score": score})
+                st.session_state.current_q += 1
+                st.rerun()
+
+if st.session_state.questions and st.session_state.current_q == len(st.session_state.questions) and not st.session_state.note_submitted:
+    st.progress(0.95, text="الخطوة الختامية: مساحة التواصل" if is_ar else "Final Step: Open Communication")
+    st.subheader("💬 مساحة مفتوحة للتواصل مع فريق تكمو" if is_ar else "💬 Open Space to Connect with Tecmo Team")
+    note_input = st.text_area("هل لديك أي استفسار أو رسالة تود مشاركتها معنا؟ (اختياري):" if is_ar else "Any questions or notes for our team? (Optional):", height=110)
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("إرسال وإنهاء التقييم ➔" if is_ar else "Submit & Complete ➔"):
+            st.session_state.candidate_note = note_input.strip() if note_input.strip() else ("لا توجد ملاحظات إضافية." if is_ar else "No additional notes.")
+            st.session_state.note_submitted = True
+            st.rerun()
+    with col2:
+        if st.button("تخطي وإصدار الملخص" if is_ar else "Skip & View Summary"):
+            st.session_state.candidate_note = "لا توجد ملاحظات إضافية." if is_ar else "No additional notes."
+            st.session_state.note_submitted = True
+            st.rerun()
+
+if st.session_state.questions and st.session_state.current_q == len(st.session_state.questions) and st.session_state.note_submitted:
+    st.progress(1.0, text="اكتمل التقييم بنجاح" if is_ar else "Assessment Completed")
+    total_score = sum(e["score"] for e in st.session_state.evaluations)
+    max_score = len(st.session_state.evaluations) * 10
+    interview_pct = round((total_score / max_score) * 100) if max_score > 0 else 85
+    cv_info = st.session_state.cv_analysis or {"detected_specialty": "عام", "edu_level": "غير محدد", "exp_years": "غير محدد", "skills": "غير محدد", "cv_score": 85}
+    cv_pct = cv_info["cv_score"]
+    final_percentage = round((interview_pct * 0.6) + (cv_pct * 0.4))
+    comm_score = min(98, interview_pct + 3)
+    decision_ar = "مرشح متميز - موصى بالمتابعة" if final_percentage >= 80 else "مؤهل للمراجعة"
+    decision_en = "Top Candidate - Recommended" if final_percentage >= 80 else "Qualified for Review"
+    
+    if not st.session_state.record_saved:
+        answers_summary = " | ".join([f"Q{i+1} ({e['type']}): {e['detail']}" for i, e in enumerate(st.session_state.evaluations)])
+        save_candidate_record({
+            "التاريخ والوقت / Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "البريد الإلكتروني / Email": st.session_state.user_email,
+            "التخصص المكتشف / Detected Specialty": cv_info["detected_specialty"],
+            "المسمى الوظيفي / Target Role": final_job_role,
+            "المدينة / City": selected_region,
+            "المؤهل / Education": cv_info["edu_level"],
+            "الخبرة / Experience": cv_info["exp_years"],
+            "المهارات المستخرجة / Extracted Skills": cv_info["skills"],
+            "توافق السيرة / CV Match %": cv_pct,
+            "النتيجة / Score": final_percentage,
+            "التوصية / Recommendation": decision_ar if is_ar else decision_en,
+            "الإجابات / Responses": answers_summary,
+            "رسالة المرشح / Message": st.session_state.candidate_note
+        })
+        st.session_state.record_saved = True
+
+    st.success("🌟 **شكراً لمشاركتك ووقتك الثمين!** تم حفظ استجاباتك وتحليل سيرتك الذاتية في قاعدة بيانات التوظيف الدائمة بنجاح." if is_ar else "🌟 **Thank You!** Your responses and resume analysis have been permanently saved.")
+    st.subheader("📊 مؤشرات التقييم التنفيذي" if is_ar else "📊 Executive Evaluation Metrics")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("مؤشر الجاهزية العام" if is_ar else "Overall Readiness", f"{final_percentage}%")
+    m2.metric("توافق السيرة الذاتية" if is_ar else "Resume Match", f"{cv_pct}%")
+    m3.metric("وضوح الطرح" if is_ar else "Communication Clarity", f"{comm_score}%")
+    st.divider()
+    details_md = "\n\n".join([f"**المحور {i+1}:** {e['question']}\n- نوع الرد: `{e['type']}` | التفاصيل: `{e['detail']}` | التقييم: `{e['score']}/10`" for i, e in enumerate(st.session_state.evaluations)])
+    report_text = f"### 📋 ملخص التقييم الرقمي للمرشح - تكمو (Tecmo)\n- **البريد الإلكتروني:** {st.session_state.user_email}\n- **التخصص المصنّف تلقائياً:** {cv_info['detected_specialty']}\n- **المسمى المستهدف:** {final_job_role}\n- **المدينة:** {selected_region}\n- **المهارات المستخرجة:** {cv_info['skills']}\n- **مؤشر الجاهزية العام:** **{final_percentage}%**\n- **التوصية:** **{decision_ar}**\n\n#### تفاصيل المحاور:\n{details_md}"
+    st.markdown(report_text)
+    st.download_button(label="📥 تحميل ملف التقييم" if is_ar else "📥 Download Summary", data=report_text, file_name=f"Tecmo_Assessment_{datetime.now().strftime('%Y%m%d_%H%M')}.md", mime="text/markdown")
+
+st.divider()
+st.markdown("<div style='text-align: center; color: #091e42; font-size: 13px; font-weight: 600;'>تطوير وتصميم: شركة تكمو وأسيل الأسمري | Developed & Designed by Tecmo & Aseel Al-Asmari<br>© 2026 All Rights Reserved</div>", unsafe_allow_html=True)
 
