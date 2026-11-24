@@ -178,7 +178,7 @@ if st.session_state.get("hr_mode", False):
         with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
             df_display.to_excel(writer, index=False, sheet_name="Tecmo_Candidates")
             ws = writer.sheets["Tecmo_Candidates"]
-            ws.views.sheetView.rightToLeft = True
+            ws.views.sheetView[0].rightToLeft = True
 
             header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
             header_font = Font(color="FFFFFF", bold=True, size=11)
