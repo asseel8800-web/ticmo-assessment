@@ -171,8 +171,53 @@ if st.session_state.get("hr_mode", False):
             df_display = df_records
                 
         st.dataframe(df_display, use_container_width=True)
-        csv_data = df_display.to_csv(sep=";", index=False).encode("utf-8-sig")
-        st.download_button(label="📥 تحميل ملف الإكسل المرتب بأفضل الترشيحات (Excel CSV)" if is_ar else "📥 Download Ranked Excel (CSV)", data=csv_data, file_name=f"Tecmo_Top_Candidates_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+               import io
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            df_display.to_excel(writer, index=False, sheet_name="Tecmo_Candidates")
+            ws = writer.sheets["Tecmo_Candidates"]
+            ws.views.sheetView.rightToLeft = True
+
+            header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+            header_font = Font(color="FFFFFF", bold=True, size=11)
+            top_pick_fill = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
+            thin_border = Border(
+                left=Side(style="thin", color="D0D7DE"),
+                right=Side(style="thin", color="D0D7DE"),
+                top=Side(style="thin", color="D0D7DE"),
+                bottom=Side(style="thin", color="D0D7DE")
+            )
+
+            ws.row_dimensions.height = 30
+            for cell in ws:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = thin_border
+
+            for row_idx in range(2, ws.max_row + 1):
+                ws.row_dimensions[row_idx].height = 42
+                is_top = any("🏆" in str(c.value or "") for c in ws[row_idx])
+                for cell in ws[row_idx]:
+                    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=True)
+                    cell.border = thin_border
+                    if is_top:
+                        cell.fill = top_pick_fill
+
+            for col in ws.columns:
+                col_letter = col.column_letter
+                max_len = max(len(str(cell.value or "")) for cell in col)
+                ws.column_dimensions[col_letter].width = min(max(max_len + 6, 18), 48)
+
+        st.download_button(
+            label="📥 تحميل ملف الإكسل المنسق والمرتب (Excel .xlsx)" if is_ar else "📥 Download Formatted Excel (.xlsx)",
+            data=excel_buffer.getvalue(),
+            file_name=f"Tecmo_Top_Candidates_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
 
     if st.button("إغلاق لوحة الإدارة" if is_ar else "Close Admin Dashboard"):
         st.session_state.hr_mode = False
