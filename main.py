@@ -171,7 +171,7 @@ if st.session_state.get("hr_mode", False):
             df_display = df_records
                 
         st.dataframe(df_display, use_container_width=True)
-               import io
+        import io
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
         excel_buffer = io.BytesIO()
