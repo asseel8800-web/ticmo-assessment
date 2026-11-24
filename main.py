@@ -190,8 +190,8 @@ if st.session_state.get("hr_mode", False):
                 bottom=Side(style="thin", color="D0D7DE")
             )
 
-            ws.row_dimensions.height = 30
-            for cell in ws:
+            ws.row_dimensions[1].height = 30
+            for cell in ws[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -207,7 +207,7 @@ if st.session_state.get("hr_mode", False):
                         cell.fill = top_pick_fill
 
             for col in ws.columns:
-                col_letter = col.column_letter
+                col_letter = col[0].column_letter
                 max_len = max(len(str(cell.value or "")) for cell in col)
                 ws.column_dimensions[col_letter].width = min(max(max_len + 6, 18), 48)
 
